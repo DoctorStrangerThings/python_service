@@ -5,6 +5,10 @@ import io
 
 app = Flask(__name__)
 
+@app.route('/')
+def home():
+    return jsonify({"status": "Python EXIF service is running."}), 200
+
 def convert_to_degrees(value):
     d, m, s = value
     degrees = d[0] / d[1]
@@ -17,11 +21,13 @@ def get_gps_coordinates(image_bytes):
         img = Image.open(io.BytesIO(image_bytes))
         exif_bytes = img.info.get("exif")
         if not exif_bytes:
+            app.logger.warning("No EXIF data found.")
             return None
 
         exif_dict = piexif.load(exif_bytes)
         gps = exif_dict.get("GPS", {})
         if not gps:
+            app.logger.warning("No GPS data in EXIF.")
             return None
 
         lat_ref = gps.get(piexif.GPSIFD.GPSLatitudeRef)
@@ -30,6 +36,7 @@ def get_gps_coordinates(image_bytes):
         lon_val = gps.get(piexif.GPSIFD.GPSLongitude)
 
         if not (lat_ref and lat_val and lon_ref and lon_val):
+            app.logger.warning("Incomplete GPS data.")
             return None
 
         lat = convert_to_degrees(lat_val)
@@ -43,7 +50,7 @@ def get_gps_coordinates(image_bytes):
         return {"latitude": lat, "longitude": lon}
 
     except Exception as e:
-        print("❌ EXIF extraction failed:", e)
+        app.logger.error(f"❌ EXIF extraction failed: {e}")
         return None
 
 @app.route("/extract", methods=["POST"])
